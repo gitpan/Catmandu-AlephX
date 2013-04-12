@@ -19,7 +19,7 @@ name: Catmandu-AlephX
 provides:
   Catmandu::AlephX:
     file: lib/Catmandu/AlephX.pm
-    version: 1.0
+    version: 1.01
   Catmandu::AlephX::Metadata:
     file: lib/Catmandu/AlephX/Metadata.pm
     version: 0
@@ -106,4 +106,4 @@ requires:
   perl: v5.10.0
 resources:
   license: http://dev.perl.org/licenses/
-version: 1.0
+version: 1.01
