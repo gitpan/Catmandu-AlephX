@@ -47,7 +47,7 @@
    "provides" : {
       "Catmandu::AlephX" : {
          "file" : "lib/Catmandu/AlephX.pm",
-         "version" : "1.01"
+         "version" : "1.02"
       },
       "Catmandu::AlephX::Metadata" : {
          "file" : "lib/Catmandu/AlephX/Metadata.pm",
@@ -89,6 +89,14 @@
          "file" : "lib/Catmandu/AlephX/Op/GetHolding.pm",
          "version" : 0
       },
+      "Catmandu::AlephX::Op::HoldReq" : {
+         "file" : "lib/Catmandu/AlephX/Op/HoldReq.pm",
+         "version" : 0
+      },
+      "Catmandu::AlephX::Op::HoldReqCancel" : {
+         "file" : "lib/Catmandu/AlephX/Op/HoldReqCancel.pm",
+         "version" : 0
+      },
       "Catmandu::AlephX::Op::IllBorInfo" : {
          "file" : "lib/Catmandu/AlephX/Op/IllBorInfo.pm",
          "version" : 0
@@ -125,6 +133,10 @@
          "file" : "lib/Catmandu/AlephX/Op/ReadItem.pm",
          "version" : 0
       },
+      "Catmandu::AlephX::Op::Renew" : {
+         "file" : "lib/Catmandu/AlephX/Op/Renew.pm",
+         "version" : 0
+      },
       "Catmandu::AlephX::Record" : {
          "file" : "lib/Catmandu/AlephX/Record.pm",
          "version" : 0
@@ -152,5 +164,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.01"
+   "version" : "1.02"
 }

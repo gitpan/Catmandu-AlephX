@@ -1,3 +1,4 @@
+CHANGES
 examples/bor_auth-sec.pl
 examples/bor_auth.pl
 examples/bor_info-sec.pl
@@ -30,6 +31,8 @@ lib/Catmandu/AlephX/Op/CircStatus.pm
 lib/Catmandu/AlephX/Op/Find.pm
 lib/Catmandu/AlephX/Op/FindDoc.pm
 lib/Catmandu/AlephX/Op/GetHolding.pm
+lib/Catmandu/AlephX/Op/HoldReq.pm
+lib/Catmandu/AlephX/Op/HoldReqCancel.pm
 lib/Catmandu/AlephX/Op/IllBorInfo.pm
 lib/Catmandu/AlephX/Op/IllGetDoc.pm
 lib/Catmandu/AlephX/Op/IllGetDocShort.pm
@@ -39,13 +42,14 @@ lib/Catmandu/AlephX/Op/ItemDataMulti.pm
 lib/Catmandu/AlephX/Op/Present.pm
 lib/Catmandu/AlephX/Op/PublishAvail.pm
 lib/Catmandu/AlephX/Op/ReadItem.pm
+lib/Catmandu/AlephX/Op/Renew.pm
 lib/Catmandu/AlephX/Record.pm
 lib/Catmandu/AlephX/Record/Present.pm
 lib/Catmandu/AlephX/Response.pm
 lib/Catmandu/AlephX/XPath/Helper.pm
 lib/Catmandu/Importer/AlephX.pm
-MANIFEST
-Makefile.PL
 LICENSE
-META.yml
+Makefile.PL
+MANIFEST
 META.json
+META.yml
