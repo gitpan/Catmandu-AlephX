@@ -25,7 +25,7 @@ use Catmandu::AlephX::Op::Renew;
 use Catmandu::AlephX::Op::HoldReq;
 use Catmandu::AlephX::Op::HoldReqCancel;
 
-our $VERSION = "1.02";
+our $VERSION = "1.03";
 
 
 has url => (

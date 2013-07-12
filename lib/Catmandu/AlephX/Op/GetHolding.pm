@@ -26,7 +26,7 @@ sub parse {
   my @cdl_holdings;
 
   for my $ch($xpath->find("/$op/cdl-holdings")->get_nodelist()){
-    push @cdl_holdings,get_children($ch);
+    push @cdl_holdings,get_children($ch,1);
   }    
 
   __PACKAGE__->new(

@@ -23,7 +23,7 @@ sub _fetch_items {
   my ($self, $doc_number) = @_;
   my $item_data = $self->aleph->item_data(base => $self->base, doc_number => $doc_number);
   
-  return unless $item_data->is_success;
+  return [] unless $item_data->is_success;
   return $item_data->items;
 }
 

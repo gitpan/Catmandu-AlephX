@@ -27,11 +27,9 @@ sub parse {
   my %args = ();
 
   for my $key(@keys){
-    my $data = get_children(
-      $xpath->find("/ill-bor-info/$key")->get_nodelist()
-    );
+    my($l) = $xpath->find("/ill-bor-info/$key")->get_nodelist();
+    my $data = $l ? get_children($l,1) : {};
     $args{$key} = $data;
-
   }
 
   __PACKAGE__->new(

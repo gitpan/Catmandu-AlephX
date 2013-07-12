@@ -54,9 +54,8 @@ sub parse {
   my $args = {};
 
   for my $zkey(qw(z303 z304 z305)){
-    $args->{$zkey} = get_children(
-      $xpath->find("/bor-info/$zkey")->get_nodelist()
-    );
+    my($l) = $xpath->find("/bor-info/$zkey")->get_nodelist();
+    $args->{$zkey} = $l ? get_children($l,1) : {};
   }
 
   for my $child($xpath->find("/bor-info/item-l")->get_nodelist()){
@@ -68,8 +67,7 @@ sub parse {
 
     for my $key(qw(z36 z30 z13)){
       for my $data($child->find("./$key")->get_nodelist()){
-        $item_l->{ $key } //= [];
-        push @{ $item_l->{ $key } },get_children($data);
+        $item_l->{ $key } = get_children($data,1);
       }
     }
     
@@ -77,12 +75,14 @@ sub parse {
 
   }
 
+
   for my $key(keys %$config){
     for my $child($xpath->find("/bor-info/$key")->get_nodelist()){
       $args->{$key} //= [];
 
       my %result = map {
-        $_ => get_children( $child->find("./$_")->get_nodelist() )
+        my($l) = $child->find("./$_")->get_nodelist();
+        $l ? ($_ => get_children($l,1 )) : ($_ => {});
       } @{ $config->{ $key } };
 
       push @{ $args->{$key} },\%result;

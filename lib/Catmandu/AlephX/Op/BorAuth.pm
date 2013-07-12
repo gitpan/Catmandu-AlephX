@@ -46,11 +46,9 @@ sub parse {
   my %args = ();
 
   for my $key(@keys){
-    my $data = get_children(
-      $xpath->find("/bor-auth/$key")->get_nodelist()
-    );
-    $args{$key} = $data;
-    
+    my($l) = $xpath->find("/bor-auth/$key")->get_nodelist();
+    my $data = $l ? get_children($l,1) : {};
+    $args{$key} = $data;    
   }  
 
   __PACKAGE__->new(

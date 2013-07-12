@@ -23,9 +23,9 @@ sub parse {
   
     my @metadata;
 
-    my $record_header = get_children(
-      $r->find('./record_header')->get_nodelist()
-    );
+    my($l) = $r->find('./record_header')->get_nodelist();
+
+    my $record_header = $l ? get_children($l,1) : {};
 
     push @metadata,Catmandu::AlephX::Metadata::MARC::Aleph->parse(
       $r->find('./metadata/oai_marc')->get_nodelist()

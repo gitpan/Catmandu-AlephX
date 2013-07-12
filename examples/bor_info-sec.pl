@@ -55,7 +55,7 @@ if($info->is_success){
     my $data = $info->$type();
     for my $key(keys %$data){
       say "\tkey: $key";
-      say "\t$key : $data->{$key}->[0]" if scalar(@{ $data->{$key} });
+      say "\t$key : $data->{$key}" if $data->{$key};
     }
   }
   say "fine:";

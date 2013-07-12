@@ -27,7 +27,7 @@ sub parse {
   my @item_data;
 
   for my $i($xpath->find("/$op/item-data")->get_nodelist()){
-    push @item_data,get_children($i);   
+    push @item_data,get_children($i,1);   
   }
 
   __PACKAGE__->new(

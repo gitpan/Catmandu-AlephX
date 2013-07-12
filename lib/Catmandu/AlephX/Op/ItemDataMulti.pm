@@ -31,7 +31,7 @@ sub parse {
   my @items;
 
   for my $item($xpath->find("/$op/item")->get_nodelist()){
-    push @items,get_children($item);
+    push @items,get_children($item,1);
   }
   __PACKAGE__->new(
     session_id => $xpath->findvalue("/$op/session-id"),
