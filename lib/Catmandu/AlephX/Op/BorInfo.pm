@@ -78,14 +78,16 @@ sub parse {
 
   for my $key(keys %$config){
     for my $child($xpath->find("/bor-info/$key")->get_nodelist()){
-      $args->{$key} //= [];
+      my $n = $key;
+      $n =~ s/-/_/go;
+      $args->{$n} //= [];
 
       my %result = map {
         my($l) = $child->find("./$_")->get_nodelist();
         $l ? ($_ => get_children($l,1 )) : ($_ => {});
       } @{ $config->{ $key } };
 
-      push @{ $args->{$key} },\%result;
+      push @{ $args->{$n} },\%result;
     }
   }
 
