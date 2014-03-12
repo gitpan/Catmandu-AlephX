@@ -1,6 +1,6 @@
 package Catmandu::AlephX::Op::BorInfo;
 use Catmandu::Sane;
-use Data::Util qw(:check :validate);
+use Catmandu::Util qw(:check :is);
 use Moo;
 
 extends('Catmandu::AlephX::Op::BorAuth');
@@ -9,7 +9,7 @@ with('Catmandu::AlephX::Response');
 has item_l => (
   is => 'ro', 
   lazy => 1,
-  isa => sub { array_ref($_[0]); },
+  isa => sub { check_array_ref($_[0]); },
   default => sub {
     []
   }
@@ -17,7 +17,7 @@ has item_l => (
 has item_h => (
   is => 'ro', 
   lazy => 1,
-  isa => sub { array_ref($_[0]); },  
+  isa => sub { check_array_ref($_[0]); },  
   default => sub {
     []
   }
@@ -33,7 +33,7 @@ has fine => (
   is => 'ro',
   lazy => 1,
   isa => sub {
-    array_ref($_[0]);
+    check_array_ref($_[0]);
   },
   default => sub {
     []
@@ -51,14 +51,16 @@ sub parse {
   my($class,$str_ref) = @_;
   my $xpath = xpath($str_ref);
 
+  my $op = op();
+
   my $args = {};
 
   for my $zkey(qw(z303 z304 z305)){
-    my($l) = $xpath->find("/bor-info/$zkey")->get_nodelist();
+    my($l) = $xpath->find("/$op/$zkey")->get_nodelist();
     $args->{$zkey} = $l ? get_children($l,1) : {};
   }
 
-  for my $child($xpath->find("/bor-info/item-l")->get_nodelist()){
+  for my $child($xpath->find("/$op/item-l")->get_nodelist()){
     $args->{'item_l'} //= [];
 
     my $item_l = {};
@@ -77,7 +79,7 @@ sub parse {
 
 
   for my $key(keys %$config){
-    for my $child($xpath->find("/bor-info/$key")->get_nodelist()){
+    for my $child($xpath->find("/$op/$key")->get_nodelist()){
       my $n = $key;
       $n =~ s/-/_/go;
       $args->{$n} //= [];
@@ -93,10 +95,11 @@ sub parse {
 
   __PACKAGE__->new(
     %$args,
-    balance => $xpath->findvalue('/bor-info/balance'),
-    sign => $xpath->findvalue('/bor-info/sign'),
-    session_id => $xpath->findvalue('/bor-info/session-id'),
-    error => $xpath->findvalue('/bor-info/error')
+    balance => $xpath->findvalue("/$op/balance"),
+    sign => $xpath->findvalue("/$op/sign"),
+    session_id => $xpath->findvalue("/$op/session-id"),
+    errors => $class->parse_errors($xpath),
+    content_ref => $str_ref
   );
 
 }

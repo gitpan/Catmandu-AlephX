@@ -13,5 +13,5 @@ my $item_data = $aleph->item_data(base => $base,doc_number => $doc_number);
 if($item_data->is_success){
   print to_json($item_data->items(),{pretty => 1});
 }else{
-  say STDERR $item_data->error;
+  say STDERR join('',@{$item_data->errors});
 }

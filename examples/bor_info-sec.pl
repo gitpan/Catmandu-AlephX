@@ -64,6 +64,6 @@ if($info->is_success){
   print Dumper($info->item_l);
 
 }else{
-  say STDERR "error: ".$info->error;
+  say STDERR "error: ".join('',@{$info->errors});
   exit 1;
 } 

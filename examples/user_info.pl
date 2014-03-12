@@ -14,6 +14,7 @@ my %args = (
   verification => 'demo'
 );
 my $info = $aleph->bor_info(%args);
+
 if($info->is_success){
   
 
@@ -35,10 +36,10 @@ if($info->is_success){
   
   say sprintf("\t%20s : %s\b",'Loans (active)',scalar(@{$info->item_l}));
   say sprintf("\t%20s : %s\b",'Loans (history)','<not implemented>');
-  say sprintf("\t%20s : %s\b",'hold requests',scalar(@{$info->item_h->[0]->{z37} // []}));
+  say sprintf("\t%20s : %s\b",'hold requests',scalar(@{$info->item_h()}));
   say sprintf("\t%20s : %s\b",'Cash',$info->balance);
 
 }else{
-  say STDERR "error: ".$info->error;
+  say STDERR "error: ".join('',@{$info->errors});
   exit 1;
 } 

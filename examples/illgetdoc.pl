@@ -12,12 +12,12 @@ my $illgetdoc = $aleph->ill_get_doc(doc_number => '001317121',library=>'rug01');
 if($illgetdoc->is_success){
 
   if($illgetdoc->record){
-    say "data: ".to_json($illgetdoc->record,{ pretty => 1 });
+    say "data: ".to_json($illgetdoc->record->metadata->data,{ pretty => 1 });
   }
   else{
     say "nothing found";
   }
 
 }else{
-  say STDERR $illgetdoc->error;
+  say STDERR join('',@{$illgetdoc->errors});
 } 

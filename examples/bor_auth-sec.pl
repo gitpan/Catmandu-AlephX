@@ -52,6 +52,6 @@ if($auth->is_success){
   }
 
 }else{
-  say STDERR "error: ".$auth->error;
+  say STDERR "error: ".join('',@{$auth->errors});
   exit 1;
 } 

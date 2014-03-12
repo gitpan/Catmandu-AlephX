@@ -2,81 +2,29 @@ package Catmandu::AlephX;
 use Catmandu::Sane;
 use Carp qw(confess);
 use Moo;
-use LWP::UserAgent;
-use URI::Escape;
-use Data::Util qw(:check :validate);
+use Catmandu::Util qw(:check :is);
 
-our $VERSION = "1.05";
+our $VERSION = "1.06";
 
 has url => (
   is => 'ro',
   isa => sub { $_[0] =~ /^https?:\/\//o or die("url must be a valid web url\n"); },
   required => 1
 );
-has _web => (
+has default_args => (
+  is => 'ro',
+  isa => sub { check_hash_ref($_[0]); },
+  lazy => 1,
+  default => sub { +{}; }
+);
+has ua => (
   is => 'ro',
   lazy => 1,
-  default => sub {
-    LWP::UserAgent->new(
-      cookie_jar => {}
-    );
-  }
+  builder => '_build_ua'
 );
-sub _validate_web_response {
-  my($res) = @_;
-  $res->is_error && confess($res->content);
-}
-sub _do_web_request {
-  my($self,$params,$method)=@_;
-  $method ||= "GET";
-  my $res;
-  if(uc($method) eq "GET"){
-    $res = $self->_get($params);
-  }elsif(uc($method) eq "POST"){
-    $res = $self->_post($params);
-  }else{
-    confess "method $method not supported";
-  }
-  _validate_web_response($res);
-  $res;
-}
-sub _post {
-  my($self,$data)=@_;
-  $self->_web->post($self->url,_construct_params_as_array($data));
-}
-sub _construct_query {
-  my $data = shift;
-  my @parts = ();
-  for my $key(keys %$data){
-    if(is_array_ref($data->{$key})){
-      for my $val(@{ $data->{$key} }){
-          push @parts,URI::Escape::uri_escape($key)."=".URI::Escape::uri_escape($val // "");
-      }
-    }else{
-      push @parts,URI::Escape::uri_escape($key)."=".URI::Escape::uri_escape($data->{$key} // "");
-    }
-  }
-  join("&",@parts);
-}
-sub _construct_params_as_array {
-    my $params = shift;
-    my @array = ();
-    for my $key(keys %$params){
-        if(is_array_ref($params->{$key})){
-            #PHP only recognizes 'arrays' when their keys are appended by '[]' (yuk!)
-            for my $val(@{ $params->{$key} }){
-                push @array,$key => $val;
-            }
-        }else{
-            push @array,$key => $params->{$key};
-        }
-    }
-    return \@array;
-}
-sub _get {
-  my($self,$data)=@_;
-  my $query = _construct_query($data) || "";
-  $self->_web->get($self->url."?$query");
+sub _build_ua {
+  require Catmandu::AlephX::UserAgent::LWP;
+  Catmandu::AlephX::UserAgent::LWP->new(url => $_[0]->url(),default_args => $_[0]->default_args());  
 }
 =head1 NAME
 
@@ -84,13 +32,15 @@ sub _get {
 
 =head1 SYNOPSIS
 
-  my $aleph = Catmandu::AlephX->new(url => "http://aleph.ugent.be");
+  my $aleph = Catmandu::AlephX->new(url => "http://localhost/X");
   my $item_data = $aleph->item_data(base => "rug01",doc_number => "001484477");
 
 
   #all public methods return a Catmandu::AlephX::Response
   # 'is_success' means that the xml-response did not contain the element 'error'
+  # most methods return only one 'error', but some (like update_doc) multiple.
   # other errors are thrown (xml parse error, no connection ..)
+  
 
   if($item_data->is_success){
 
@@ -98,7 +48,7 @@ sub _get {
 
   }else{
 
-    say "aleph x server returned error-response: ".$item_data->error;
+    say "aleph x server returned error-response: ".join("\n",@{$item_data->errors});
 
   }
 
@@ -122,7 +72,7 @@ For each of the document's items it retrieves:
       print Dumper($item);
     };
   }else{
-    print STDERR $item_data->error."\n";
+    print STDERR join("\n",@{$item_data->errors})."\n";
   }
 
 =head3 remarks
@@ -134,8 +84,8 @@ sub item_data {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::ItemData;
   $args{'op'} = Catmandu::AlephX::Op::ItemData->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::ItemData->parse($res->content_ref());    
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::ItemData->parse($res->content_ref(),\%args);    
 }
 =head2 item-data-multi
  
@@ -155,7 +105,7 @@ It is similar to the item_data X-service, except for the parameter START_POINT, 
       print Dumper($item);
     };
   }else{
-    print STDERR $item_data_m->error."\n";
+    print STDERR join("\n",@{$item_data_m->errors})."\n";
   }
 
   say "items retrieved, starting at ".$item_data_m->start_point() if $item_data_m->start_point();
@@ -170,8 +120,8 @@ sub item_data_multi {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::ItemDataMulti;
   $args{'op'} = Catmandu::AlephX::Op::ItemDataMulti->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::ItemDataMulti->parse($res->content_ref());    
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::ItemDataMulti->parse($res->content_ref(),\%args);    
 }
 =head2 read_item
 
@@ -187,7 +137,7 @@ sub item_data_multi {
       print Dumper($z30);
     }
   }else{
-    say STDERR $readitem->error;
+    say STDERR join("\n",@{$readitem->errors});
   }
 
 =head3 remarks
@@ -200,8 +150,8 @@ sub read_item {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::ReadItem;
   $args{'op'} = Catmandu::AlephX::Op::ReadItem->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::ReadItem->parse($res->content_ref());    
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::ReadItem->parse($res->content_ref(),\%args);    
 }
 
 =head2 find
@@ -218,7 +168,7 @@ sub read_item {
     say "no_records: ".$find->no_records;
     say "no_entries: ".$find->no_entries;
   }else{
-    say STDERR $find->error;
+    say STDERR join("\n",@{$find->errors});
   }
 
 =head3 remarks
@@ -234,8 +184,8 @@ sub find {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::Find;
   $args{'op'} = Catmandu::AlephX::Op::Find->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::Find->parse($res->content_ref());    
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::Find->parse($res->content_ref(),\%args);    
 }
 
 =head2 find_doc
@@ -248,11 +198,9 @@ sub find {
 
   my $find = $aleph->find_doc(base=>'rug01',doc_num=>'000000444',format=>'marc');
   if($find->is_success){
-    for my $record(@{ $find->records }){
-      say Dumper($record);
-    }
+    say Dumper($find->record);
   }else{
-    say STDERR $find->error;
+    say STDERR join("\n",@{$find->errors});
   }
 
 =head3 remarks
@@ -264,8 +212,8 @@ sub find_doc {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::FindDoc;
   $args{'op'} = Catmandu::AlephX::Op::FindDoc->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::FindDoc->parse($res->content_ref());    
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::FindDoc->parse($res->content_ref(),\%args);    
 }
 
 =head2 present
@@ -283,12 +231,12 @@ sub find_doc {
     set_entry => "000000001-000000003"
   );
   if($present->is_success){
-    say "doc_number: ".$record->{doc_number};
-    for my $metadata(@{ $record->metadata }){
-      say "\tmetadata: ".$metadata->type;
+    for my $record(@{ $present->records() }){
+      say "doc_number: ".$record->doc_number;
+      say "\tmetadata: ".$record->metadata->type;
     }
   }else{
-    say STDERR $present->error;
+    say STDERR join("\n",@{$present->errors});
   }
 
 =head3 remarks
@@ -300,8 +248,8 @@ sub present {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::Present;
   $args{'op'} = Catmandu::AlephX::Op::Present->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::Present->parse($res->content_ref());    
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::Present->parse($res->content_ref(),\%args);    
 }
 
 =head2 ill_get_doc_short
@@ -318,7 +266,7 @@ sub present {
       print Dumper($z30);
     }
   }else{
-    say STDERR $result->error;
+    say STDERR join("\n",@{$result->errors});
   }
 
 =head3 remarks
@@ -330,8 +278,8 @@ sub ill_get_doc_short {
   my($self,%args)=@_; 
   require Catmandu::AlephX::Op::IllGetDocShort;
   $args{'op'} = Catmandu::AlephX::Op::IllGetDocShort->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::IllGetDocShort->parse($res->content_ref());    
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::IllGetDocShort->parse($res->content_ref(),\%args);    
 }
 =head2 bor_auth
 
@@ -360,7 +308,7 @@ sub ill_get_doc_short {
     }
 
   }else{
-    say STDERR "error: ".$auth->error;
+    say STDERR "error: ".join("\n",@{$auth->errors});
     exit 1;
   }
 
@@ -369,8 +317,8 @@ sub bor_auth {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::BorAuth;
   $args{'op'} = Catmandu::AlephX::Op::BorAuth->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::BorAuth->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::BorAuth->parse($res->content_ref(),\%args);
 } 
 =head2 bor_info
 
@@ -411,7 +359,7 @@ sub bor_auth {
     }
 
   }else{
-    say STDERR "error: ".$info->error;
+    say STDERR "error: ".join("\n",@{$info->errors});
     exit 1;
   }
 
@@ -420,8 +368,8 @@ sub bor_info {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::BorInfo;
   $args{'op'} = Catmandu::AlephX::Op::BorInfo->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::BorInfo->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::BorInfo->parse($res->content_ref(),\%args);
 }
 
 =head2 ill_bor_info
@@ -437,16 +385,16 @@ sub ill_bor_info {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::IllBorInfo;
   $args{'op'} = Catmandu::AlephX::Op::IllBorInfo->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::IllBorInfo->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::IllBorInfo->parse($res->content_ref(),\%args);
 }
 
 sub ill_loan_info {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::IllLoanInfo;
   $args{'op'} = Catmandu::AlephX::Op::IllLoanInfo->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::IllLoanInfo->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::IllLoanInfo->parse($res->content_ref(),\%args);
 }
 =head2 circ_status
 
@@ -465,8 +413,8 @@ sub circ_status {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::CircStatus;
   $args{'op'} = Catmandu::AlephX::Op::CircStatus->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::CircStatus->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::CircStatus->parse($res->content_ref(),\%args);
 }
 =head2 circ_stat_m
 
@@ -487,8 +435,8 @@ sub circ_stat_m {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::CircStatM;
   $args{'op'} = Catmandu::AlephX::Op::CircStatM->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::CircStatM->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::CircStatM->parse($res->content_ref(),\%args);
 }
 =head2 publish_avail
 
@@ -518,7 +466,7 @@ if($publish->is_success){
     say "\n---";
   }
 }else{
-  say STDERR $publish->error;
+  say STDERR join("\n",@{$publish->errors});
 }
 
 =head3 remarks
@@ -531,8 +479,8 @@ sub publish_avail {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::PublishAvail;
   $args{'op'} = Catmandu::AlephX::Op::PublishAvail->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::PublishAvail->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::PublishAvail->parse($res->content_ref(),\%args);
 }
 =head2 ill_get_doc
 
@@ -553,7 +501,7 @@ if($illgetdoc->is_success){
   }
 
 }else{
-  say STDERR $illgetdoc->error;
+  say STDERR join("\n",@{$illgetdoc->errors});
 }
 
 =cut
@@ -561,8 +509,8 @@ sub ill_get_doc {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::IllGetDoc;
   $args{'op'} = Catmandu::AlephX::Op::IllGetDoc->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::IllGetDoc->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::IllGetDoc->parse($res->content_ref(),\%args);
 }
 =head2 renew
 
@@ -578,8 +526,8 @@ sub renew {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::Renew;
   $args{'op'} = Catmandu::AlephX::Op::Renew->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::Renew->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::Renew->parse($res->content_ref(),\%args);
 }
 =head2 hold_req
 
@@ -594,22 +542,186 @@ sub hold_req {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::HoldReq;
   $args{'op'} = Catmandu::AlephX::Op::HoldReq->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::HoldReq->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::HoldReq->parse($res->content_ref(),\%args);
 }
 sub hold_req_cancel {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::HoldReqCancel;
   $args{'op'} = Catmandu::AlephX::Op::HoldReqCancel->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::HoldReqCancel->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::HoldReqCancel->parse($res->content_ref(),\%args);
 }
 sub user_auth {
   my($self,%args)=@_;
   require Catmandu::AlephX::Op::UserAuth;
   $args{op} = Catmandu::AlephX::Op::UserAuth->op();
-  my $res = $self->_do_web_request(\%args);
-  Catmandu::AlephX::Op::UserAuth->parse($res->content_ref());
+  my $res = $self->ua->request(\%args);
+  Catmandu::AlephX::Op::UserAuth->parse($res->content_ref(),\%args);
+}
+=head2 update_doc
+
+=head3 documentation from Aleph X
+
+  The service performs actions (Update / Insert / Delete) related to the update of a document.
+  (The service uses pc_cat_c0203 which updates a document via the GUI).
+
+=head3 notes
+
+  When executing an update request, most of the 'errors' will be warnings instead of real errors.
+  This happens because AlephX performs an 'UPDATE-CHK' before trying to execute an 'UPDATE',
+  and stores all warnings during that check in the xml attribute 'error'.
+
+  Therefore the method 'is_success' of the Catmandu::AlephX::Response is not very usefull in this case.
+  Search for the last 'error', and check wether it contains 'updated successfully'.
+
+=head3 warnings
+
+  An updates replaces the WHOLE record. So if you fail to supply 'xml_full_req' (or indirectly 'marc'),
+  the record will be deleted!
+
+  To be sure, please use the full xml response of 'find-doc', change the fields inside 'oai_marc', and
+  supply this xml as xml_full_req.
+
+  Every updates adds a CAT-field to the record. Your updates can be recognized by CAT$$a == "WWW-X".
+  When updating a record you need to include the old CAT fields (default), otherwise these fields will be deleted
+  (and all history will be lost).
+
+  "Unlike other X-Services, the parameters can include XML up to 20,000 characters in length"
+
+  When you update often (and therefore add a lot of CAT fields), this can lead to the error 'Server closed connection'.
+  This is due to the maximum of characters allowed in an XML request. 
+
+  Possible solution: 
+    1. retrieve record by 'find_doc'
+    2. get marc record: 
+
+        my $marc = $res->record->metadata->data
+
+    3. filter out your CAT fields ($a == "WWW-X") to shorten the XML:
+        
+        $marc = [grep { !( $_->[0] eq "CAT" && $_->[4] eq "WWW-X" ) } @$marc];
+
+    4. update $marc
+    5. send
+
+        $aleph->update_doc(library => 'usm01',doc_action => 'UPDATE',doc_number => $doc_number,marc => $marc);
+
+        => your xml will now contain one CAT field with subfield 'a' equal to 'WWW-X'.
+
+=head3 example
+
+  my $aleph = Catmandu::AlephX->new(url => "http://localhost/X");
+
+  my $doc_number = '000000444';
+  my $find_doc = $aleph->find_doc(
+    doc_num => $doc_number,
+    base => "usm01"
+  );
+  my $marc = $find_doc->record->metadata->data;
+  my $content_ref = $find_doc->content_ref;
+
+  my %args = (
+    'library' => 'usm01',
+    'doc_action' => 'UPDATE',
+    'doc_number' => $doc_number,
+    xml_full_req => $$content_ref
+  );
+  my $u = $aleph->update_doc(%args);
+  if($u->is_success){
+    say "all ok";
+  }else{
+    say STDERR join("\n",@{$u->errors});
+  }
+
+=head3 special support for catmandu marc records
+
+  when you supply the argument 'marc', an xml document will be created for you,
+  and stored in the argument 'xml_full_req'. 'marc' must be an array of arrays.
+  When you already supplied 'xml_full_req', it will be overwritten.
+
+=cut
+sub update_doc {
+  my($self,%args)=@_;
+  require Catmandu::AlephX::Op::UpdateDoc;
+  $args{op} = Catmandu::AlephX::Op::UpdateDoc->op();
+
+  if($args{marc}){
+    require Catmandu::AlephX::Metadata::MARC::Aleph;
+    my $m = Catmandu::AlephX::Metadata::MARC::Aleph->to_xml($args{marc});
+    my $xml = <<EOF;
+<?xml version = "1.0" encoding = "UTF-8"?>
+<find-doc><record><metadata>$m</metadata></record></find-doc>
+EOF
+    if(length($xml) > 20000){
+      confess "xml_full_req cannot be longer than 20000 characters";
+    }
+    $args{xml_full_req} = $xml;
+    delete $args{marc};
+
+  }elsif(is_string($args{doc_action}) && $args{doc_action} eq "DELETE" && !is_string($args{xml_full_req})){
+
+    #although this is a delete action, determined by 'doc_num', AlephX still needs an xml_full_req, even when empty
+    $args{xml_full_req} = <<EOF;
+<?xml version = "1.0" encoding = "UTF-8"?>
+<find-doc></find-doc>
+EOF
+
+  }
+
+  my $res = $self->ua->request(\%args,"POST");
+  Catmandu::AlephX::Op::UpdateDoc->parse($res->content_ref(),\%args);
+}
+=head2 update_item
+
+=head3 documentation from Aleph X
+
+  The service updates an existing item in the required ADM library after performing all relevant initial checks prior to that action.
+
+=head3 notes
+
+  AlephX stores not only errors in 'errors', but also the success message.
+
+  Therefore the method 'is_success' of the Catmandu::AlephX::Response is not very usefull in this case.
+  Search for the last 'error', and check wether it contains 'updated successfully'.
+
+  The result of 'read_item' often contains translations, instead of the real values. But these
+  translation cannot be used when updating items. 
+
+  e.g. z30-item-status contains 'Regular loan' instead of '001'. 
+
+=head3 example
+
+  my $alephx = Catmandu::AlephX->new(url => "http://localhost/X");
+  my $item_barcode = '32044044980076';
+
+  my %args = (
+    'library' => 'usm50',
+    'item_barcode' => $item_barcode,
+  );
+
+  my $z30 = $alephx->read_item(%args)->z30(); 
+
+  my $xml = XMLout($z30,,RootName=>"z30",NoAttr => 1);
+  $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".$xml; 
+
+  $args{xml_full_req} = $xml;
+
+  my $u = alephx->update_item(%args);
+  if($u->is_success){
+    say "all ok";
+  }else{
+    say STDERR join("\n",@{$u->errors});
+  } 
+
+=cut
+
+sub update_item {
+  my($self,%args)=@_;
+  require Catmandu::AlephX::Op::UpdateItem;
+  $args{op} = Catmandu::AlephX::Op::UpdateItem->op();
+  my $res = $self->ua->request(\%args,"POST");
+  Catmandu::AlephX::Op::UpdateItem->parse($res->content_ref(),\%args);
 }
 
 =head1 AUTHOR

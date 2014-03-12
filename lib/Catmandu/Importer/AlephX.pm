@@ -1,6 +1,6 @@
 package Catmandu::Importer::AlephX;
-
 use Catmandu::Sane;
+use Catmandu::Util qw(:check :is);
 use Moo;
 use Catmandu::AlephX;
 use Data::Dumper;
@@ -11,43 +11,111 @@ our $VERSION = '0.02';
 
 has url     => (is => 'ro', required => 1);
 has base    => (is => 'ro', required => 1);
-has query   => (is => 'ro', required => 1);
-has aleph   => (is => 'ro', init_arg => undef , lazy => 1 , builder => '_build_aleph');
+has query   => (is => 'ro' );
+has include_items => (is => 'ro',required => 0,lazy => 1,default => sub { 1; });
+has limit => (
+  is => 'ro',
+  isa => sub { check_natural($_[0]); },
+  lazy => 1,
+  default => sub { 20; }
+);
+has alephx   => (is => 'ro', init_arg => undef , lazy => 1 , builder => '_build_alephx');
 
-sub _build_aleph {
-  my ($self) = @_;
-  Catmandu::AlephX->new(url => $self->url);
+sub _build_alephx {
+  Catmandu::AlephX->new(url => $_[0]->url);
 }
 
 sub _fetch_items {
   my ($self, $doc_number) = @_;
-  my $item_data = $self->aleph->item_data(base => $self->base, doc_number => $doc_number);
+  my $item_data = $self->alephx->item_data(base => $self->base, doc_number => $doc_number);
   
   return [] unless $item_data->is_success;
   return $item_data->items;
 }
 
 sub generator {
-  my ($self) = @_;
-  my $find    = $self->aleph->find(request => $self->query , base => $self->base);
-  
-  return sub {undef} unless $find->is_success;    
-  
-  sub {
-    state $set_number = $find->set_number;
-    state $no_records = int($find->no_records);
-    state $count = 0;
+  my $self = $_[0];
 
-    return if ($no_records == 0 || $count >= $no_records );
-    my $present = $self->aleph->present(set_number => $set_number , set_entry => sprintf("%-9.9d",++$count));
-    return unless $present->is_success;
-    return unless @{$present->records} == 1;
- 
-    my $doc   = $present->records->[0];
-    my $items = $self->_fetch_items($doc->{doc_number});
+  #generator, based on a query (limited)
+  if(is_string($self->query)){
+
+    return sub {
+      my $find = $self->alephx->find(request => $self->query , base => $self->base);
+
+      return unless $find->is_success;
+
+      state $buffer = [];
+      state $set_number = $find->set_number;
+      state $no_records = int($find->no_records);
+      state $no_entries = int($find->no_entries);
+
+      #warning: no_records is the number of records found, but only no_entries are stored in the set.
+      #         a call to 'present' with set_number higher than no_entries has no use.
+     
+      state $offset = 1;
+      state $limit = $self->limit;
+
+      return if $no_entries == 0 || $offset > $no_entries;
+
+      unless(@$buffer){
+
+        my $set_entry;
+        {
+          my $start = sprintf("%-9.9d",$offset);
+          my $l = $offset + $limit - 1;
+          my $end = sprintf("%-9.9d",($l > $no_entries ? $no_entries : $l));
+          $set_entry = "$start-$end";        
+        }
+        
+        my $present = $self->alephx->present(set_number => $set_number , set_entry => $set_entry);
+        return unless $present->is_success;
+
+        for my $record(@{ $present->records() }){
+
+          my $items = [];
+          if($self->include_items){
+            $items = $self->_fetch_items($record->{doc_number});
+          }
+          #do NOT use $record->metadata->data->{_id}, for that uses the field '001' that can be empty
+          push @$buffer,{ record => $record->metadata->data->{record} , items => $items, _id => $record->{doc_number} };
+
+        }
+
+        $offset += $limit;
+
+      }
+
+      shift(@$buffer);
+    };
+
+  }
+  #generator that tries to fetch all records
+  else{
+
+    return sub {
+
+      state $count = 1;
+      state $alephx = $self->alephx;
     
-    { record => $doc->metadata->[0]->data , items => $items };
-  };
+      my $doc_num = sprintf("%-9.9d",$count++);     
+      my $find_doc = $alephx->find_doc(base => $self->base,doc_num => $doc_num);
+      
+      return unless $find_doc->is_success;
+
+      my $items = [];
+      if($self->include_items){
+        $items = $self->_fetch_items($doc_num);
+      }
+
+      return {
+        record => $find_doc->record->metadata->data->{record},
+        items => $items,
+        #do NOT use $record->metadata->data->{_id}, for that uses the field '001' that can be empty
+        _id => $doc_num
+      };
+      
+    };
+  }
 }
 
 =head1 NAME
@@ -65,8 +133,10 @@ Catmandu::Importer::AlephX - Package that imports metadata records from the Alep
                         );
 
     my $n = $importer->each(sub {
-        my $hashref = $_[0];
+        my $r = $_[0];
         # ...
+        say Dumper($r->{record});
+        say Dumper($r->{items});
     });
 
 =head1 METHODS
@@ -74,6 +144,62 @@ Catmandu::Importer::AlephX - Package that imports metadata records from the Alep
 =head2 new(url => '...' , base => '...' , query => '...')
 
 Create a new AlephX importer. Required parameters are the url baseUrl of the AlephX service, an Aleph 'base' catalog name and a 'query'.
+
+=head3 common parameters
+
+    url             base url of alephx service (e.g. "http://ram19:8995/X")
+    include_items   0|1. When set to '1', the items of every bibliographical record  are retrieved
+    
+=head3 alephx parameters
+
+    base    name of catalog in Aleph where you want to search    
+    query   the query of course
+
+=head3 output
+
+  {
+    record => [
+      [
+        'FMT',
+        '',
+        '',
+        '_',
+        'MX'
+      ],
+      [
+        'LDR',
+        '',
+        '',
+        '_',
+        '01236npca^22001937|^4500'
+      ]
+      ..
+    ],
+    items => [
+      {
+        'sub-library' => 'WID',
+        'chronological-k' => '',
+        'chronological-i' => '',
+        'library' => 'USM50',
+        'collection' => 'HD',
+        'call-no-1' => '$$2ZHCL$$hH 810.80.20',
+        'chronological-j' => '',
+        'requested' => 'N',
+        'expected' => 'N',
+        'barcode' => 'HWM4M4',
+        'description' => '',
+        'note' => '',
+        'item-status' => '01',
+        'rec-key' => '000048762000010',
+        'enumeration-a' => '',
+        'call-no-2' => '',
+        'enumeration-b' => '',
+        'enumeration-c' => '',
+        'on-hold' => 'N'
+      }
+    ]
+
+  }
 
 =head2 count
 

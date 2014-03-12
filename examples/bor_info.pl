@@ -11,12 +11,14 @@ my $aleph = Catmandu::AlephX->new(url => "http://aleph.ugent.be/X");
 my %args = (
   library => "rug50",
   bor_id => "demo",
-  verification => "demo"
+  verification => "demo",
+  user_name => "t",
+  user_password => "t"
 );
 my $info = $aleph->bor_info(%args);
 if($info->is_success){
   print Dumper($info->item_l);
   print Dumper($info->item_h);
 }else{
-  say STDERR $info->error;
+  say STDERR join('',@{$info->errors});
 } 

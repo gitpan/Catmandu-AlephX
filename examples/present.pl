@@ -15,12 +15,10 @@ my $present = $aleph->present(
 );
 if($present->is_success){
   for my $record(@{ $present->records }){
-    say "record_header: ".Dumper($record->{record_header});
-    for my $metadata(@{ $record->metadata }){
-      say "\ttype: ".$metadata->type;
-      say "\tdata: ".Dumper($metadata->data());     
-    }
+    say "record_header: ".Dumper($record->{record_header});    
+    say "\ttype: ".$record->metadata->type;
+    say "\tdata: ".Dumper($record->metadata->data());     
   }
 }else{
-  say STDERR $present->error;
+  say STDERR join('',@{$present->errors});
 } 

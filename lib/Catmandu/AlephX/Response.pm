@@ -1,7 +1,7 @@
 package Catmandu::AlephX::Response;
 use Catmandu::Sane;
 use Moo::Role;
-use Data::Util qw(:validate :check);
+use Catmandu::Util qw(:is :check);
 use Catmandu::AlephX::XPath::Helper qw(:all);
 use Exporter qw(import);
 our @EXPORT_OK=qw(get_children xpath);
@@ -49,9 +49,29 @@ our %EXPORT_TAGS = (all=>[@EXPORT_OK]);
 
 =cut
 
-requires 'op';
-has error => (is => 'rw');
+requires qw(op parse);
+has errors => (
+  is => 'rw',
+  isa => sub { check_array_ref($_[0]); },
+  lazy => 1,
+  default => sub { []; }
+);
+#deprecated, use $self->errors
+sub error {
+  warn "method 'error' is deprecated, and only return one error. Please use method 'errors' which gives you an array reference of all errors.";
+  $_[0]->errors()->[-1];
+}
 has session_id => (is => 'rw');
-sub is_success { return !is_string($_[0]->error); }
+sub is_success { 
+  return !scalar(@{$_[0]->errors()}); 
+}
+has content_ref => (
+  is => 'rw'
+);
+sub parse_errors {
+  my($self,$xpath)=@_;
+  my $op = $self->op();
+  [map { $_->to_literal; } $xpath->find("/$op/error|/login/error|/$op/error-text-1|/$op/error-text-2")->get_nodelist()];
+}
 
 1;

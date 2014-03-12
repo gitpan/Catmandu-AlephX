@@ -15,5 +15,5 @@ if($find->is_success){
   say "no_entries: ".$find->no_entries;
   say "session_id: ".$find->session_id;
 }else{
-  say STDERR $find->error;
+  say STDERR join('',@{$find->errors});
 } 

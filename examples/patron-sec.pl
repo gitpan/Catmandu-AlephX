@@ -69,6 +69,6 @@ if($info->is_success){
 
   
 }else{
-  say STDERR "error: ".$info->error;
+  say STDERR "error: ".join('',@{$info->errors});
   exit 1;
 } 

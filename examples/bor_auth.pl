@@ -23,5 +23,5 @@ if($auth->is_success){
 
 
 }else{
-  say STDERR $auth->error;
+  say STDERR join('',@{$auth->errors});
 } 

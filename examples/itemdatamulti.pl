@@ -15,5 +15,5 @@ if($item_data->is_success){
     print Dumper($item);
   };
 }else{
-  say STDERR $item_data->error;
+  say STDERR join('',@{$item_data->errors});
 }

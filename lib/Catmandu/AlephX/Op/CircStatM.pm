@@ -1,6 +1,6 @@
 package Catmandu::AlephX::Op::CircStatM;
 use Catmandu::Sane;
-use Data::Util qw(:check);
+use Catmandu::Util qw(:check);
 use Moo;
 
 with('Catmandu::AlephX::Response');
@@ -9,7 +9,7 @@ with('Catmandu::AlephX::Response');
 
 has item_data => (
   is => 'ro',
-  isa => sub { array_ref($_[0]); }
+  isa => sub { check_array_ref($_[0]); }
 );
 #only appears in the xml output when over 990 items are present
 has start_point => (
@@ -34,7 +34,8 @@ sub parse {
     start_point => $xpath->findvalue("/$op/start-point"),
     item_data => \@item_data,
     session_id => $xpath->findvalue("/$op/session-id"),
-    error => $xpath->findvalue("/$op/error")
+    errors => $class->parse_errors($xpath),
+    content_ref => $str_ref
   );
   
 }

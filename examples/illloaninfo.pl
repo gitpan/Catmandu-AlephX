@@ -12,5 +12,5 @@ my $result = $aleph->ill_loan_info(doc_number => "000030527",library=>"rug01",it
 if($result->is_success){
   print Dumper($result->z36);
 }else{
-  say STDERR $result->error;
+  say STDERR join('',@{$result->errors});
 }
