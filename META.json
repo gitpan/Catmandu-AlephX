@@ -47,7 +47,7 @@
    "provides" : {
       "Catmandu::AlephX" : {
          "file" : "lib/Catmandu/AlephX.pm",
-         "version" : "1.06"
+         "version" : "1.061"
       },
       "Catmandu::AlephX::Metadata" : {
          "file" : "lib/Catmandu/AlephX/Metadata.pm"
@@ -115,6 +115,15 @@
       "Catmandu::AlephX::Op::Renew" : {
          "file" : "lib/Catmandu/AlephX/Op/Renew.pm"
       },
+      "Catmandu::AlephX::Op::UpdateDoc" : {
+         "file" : "lib/Catmandu/AlephX/Op/UpdateDoc.pm"
+      },
+      "Catmandu::AlephX::Op::UpdateItem" : {
+         "file" : "lib/Catmandu/AlephX/Op/UpdateItem.pm"
+      },
+      "Catmandu::AlephX::Op::UserAuth" : {
+         "file" : "lib/Catmandu/AlephX/Op/UserAuth.pm"
+      },
       "Catmandu::AlephX::Record" : {
          "file" : "lib/Catmandu/AlephX/Record.pm"
       },
@@ -124,12 +133,25 @@
       "Catmandu::AlephX::Response" : {
          "file" : "lib/Catmandu/AlephX/Response.pm"
       },
+      "Catmandu::AlephX::UserAgent" : {
+         "file" : "lib/Catmandu/AlephX/UserAgent.pm"
+      },
+      "Catmandu::AlephX::UserAgent::LWP" : {
+         "file" : "lib/Catmandu/AlephX/UserAgent/LWP.pm"
+      },
       "Catmandu::AlephX::XPath::Helper" : {
          "file" : "lib/Catmandu/AlephX/XPath/Helper.pm"
       },
       "Catmandu::Importer::AlephX" : {
          "file" : "lib/Catmandu/Importer/AlephX.pm",
          "version" : "0.02"
+      },
+      "Catmandu::Store::AlephX" : {
+         "file" : "lib/Catmandu/Store/AlephX.pm",
+         "version" : "0.01"
+      },
+      "Catmandu::Store::AlephX::Bag" : {
+         "file" : "lib/Catmandu/Store/AlephX.pm"
       }
    },
    "release_status" : "stable",
@@ -138,5 +160,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.06"
+   "version" : "1.061"
 }
