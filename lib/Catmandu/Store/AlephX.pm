@@ -1,4 +1,18 @@
 package Catmandu::Store::AlephX;
+=head1 NAME
+
+Catmandu::Store::AlephX - A Catmandu AlephX service implemented as Catmandu::Store
+
+=head1 SYNOPSIS
+
+ use Catmandu::Store::AlephX;
+
+ my $store = Catmandu::Store::AlephX->new(url => 'http://aleph.ugent.be/X' , username => 'XXX' , password => 'XXX');
+
+ $store->bag('usm01')->each(sub {
+ });
+
+=cut
 use namespace::clean;
 use Catmandu::Sane;
 use Catmandu::Util qw(:is :check);
@@ -65,6 +79,11 @@ sub check_catmandu_marc {
   check_array_ref($_) for @{ $r->{record} };
 }
 
+=head1 METHODS
+
+=head2 get($id)
+
+=cut
 sub get {
   my($self,$id)=@_;
   my $alephx = $self->store->alephx;
@@ -200,6 +219,9 @@ sub add {
   
 }
 
+=head2 delete($id)
+
+=cut
 sub delete {
   my($self,$id)= @_;
   
@@ -219,6 +241,7 @@ EOF
   #last error: 'Document: 000050124 was updated successfully.'
   (scalar(@{ $update_doc->errors() })) && ($update_doc->errors()->[-1] =~ /Document: $id was updated successfully./);  
 }
+
 sub generator {
   my $self = $_[0];
 
@@ -245,6 +268,10 @@ sub generator {
     
   };
 }
+
+=head2 search(query => $query, start => 0 , limit => 20);
+
+=cut
 #warning: no_entries is the maximum number of entries to be retrieved (always lower or equal to no_records)
 #         specifying a set_entry higher than this, has no use, and leads to the error 'There is no entry number: <set_entry> in set number given'
 sub search {
@@ -262,47 +289,75 @@ sub search {
     base => $self->name,
     user_name => ""
   );
-  
-  return unless $find->is_success;
-
-  my $no_records = int($find->no_records);
-  my $no_entries = int($find->no_entries);
+ 
+  my @results = ();
+     
+  if ($find->is_success) {
+        my $no_records = int($find->no_records);
+        my $no_entries = int($find->no_entries);
     
-  my $s = sprintf("%-9.9d",$start + 1);
-  my $l = $start + $limit;
-  my $e = sprintf("%-9.9d",($l > $no_entries ? $no_entries : $l));
-  my $set_entry = "$s-$e";
+        my $s = sprintf("%-9.9d",$start + 1);
+        my $l = $start + $limit;
+        my $e = sprintf("%-9.9d",($l > $no_entries ? $no_entries : $l));
+        my $set_entry = "$s-$e";
 
-  my $present = $alephx->present(set_number => $find->set_number,set_entry => $set_entry,format => 'marc',user_name => "");
+        my $present = $alephx->present(set_number => $find->set_number,set_entry => $set_entry,format => 'marc',user_name => "");
 
-  return unless $present->is_success;
+        @results = map { $_->metadata->data; } @{ $present->records() } if $present->is_success;
+  }
 
-  my @results;
-
-  @results = map { $_->metadata->data; } @{ $present->records() };
-
-  my $hits = Catmandu::Hits->new({
+  my $total = $find->no_records;
+  $total = 0 unless defined $total && $total =~ /\d+/;
+ 
+  Catmandu::Hits->new({
     limit => $limit,
     start => $start,
-    total => $find->no_records,
+    total => int($total),
     hits  => \@results,
   }); 
 }
+
+=head2 searcher()
+
+Not implemented
+
+=cut
 sub searcher {
   die("not implemented");
 }
 
-#not supported for security reasons
+=head2 delete_all()
+
+Not implemented
+
+=cut
 sub delete_all {
   die("not supported");
 }
+
+
+=head2 delete_by_query()
+
+Not implemented
+
+=cut
 sub delete_by_query {
   die("not supported");
 }
+
 sub translate_sru_sortkeys {
   die("not supported");
 }
+
+
 sub translate_cql_query {
   die("not supported");
 }
+
+=head1 SEE ALSO
+
+L<Catmandu::Store>
+
+=cut
+
 1;
