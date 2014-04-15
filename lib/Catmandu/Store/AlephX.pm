@@ -73,15 +73,27 @@ before add => sub {
 };
 
 sub check_catmandu_marc {
-  my $r = $_[0];
-  check_hash_ref($r);  
-  check_array_ref($r->{record});
-  check_array_ref($_) for @{ $r->{record} };
+    my $r = $_[0];
+    check_hash_ref($r);  
+    check_array_ref($r->{record});
+    check_array_ref($_) for @{ $r->{record} };
+}
+
+sub check_deleted {
+    my $r = $_[0];
+    return 1 unless defined $r;
+    for (@{$r->{record}}) {
+        return 1 if ($_->[0] eq 'DEL');
+    }
+    return 0;
 }
 
 =head1 METHODS
 
 =head2 get($id)
+
+Retrieves a record from the Aleph database. Requires a record identifier. Returns a Catmandu MARC record
+when found and undef on failure.
 
 =cut
 sub get {
@@ -96,16 +108,26 @@ sub get {
     user_name => ""
   );
   
-  return unless($find_doc->is_success);
+  return undef unless($find_doc->is_success);
 
-  $find_doc->record->metadata->data;
+  my $doc = $find_doc->record->metadata->data;
+
+  return undef if check_deleted($doc);
+
+  return $doc;
 }
+
+
 =head2 add($catmandu_marc)
+
+Adds or updates a record to the Aleph database. Requires a Catmandu type MARC record and a _id field
+containing the Aleph record number. This method with throw an error when an add cant be executed.
 
 =head3 example
 
   #add new record. WARNING: Aleph will ignore the 001 field, 
-  my $new_record = $bag->add({
+  my $new_record = eval {
+    $bag->add({
     record =>  [
       [
         'FMT',
@@ -138,6 +160,12 @@ sub get {
       ..
     ]    
   });
+
+  };
+  if ($@) {
+    die "add failed $@";
+  }
+
   say "new record:".$record->{_id};
 
 =cut
@@ -221,6 +249,9 @@ sub add {
 
 =head2 delete($id)
 
+Deletes a record from the Aleph database. Requires a record identifier. Returns a true value when the 
+record is deleted.
+
 =cut
 sub delete {
   my($self,$id)= @_;
@@ -242,11 +273,14 @@ EOF
   (scalar(@{ $update_doc->errors() })) && ($update_doc->errors()->[-1] =~ /Document: $id was updated successfully./);  
 }
 
+=head2 each(callback)
+
+Loops over all records in the Aleph database executing callback for every record.
+
+=cut
 sub generator {
   my $self = $_[0];
 
-  #TODO: skip deleted records? (DEL$$a == 'Y')
-  #      <varfield id="DEL" i1=" " i2=" "><subfield label="a">Y</subfield></varfield>
   #TODO: in some cases, deleted records are really removed from the database
   #      in these cases, it does not make sense to interpret a failing 'find-doc' as the end of the database.
   #      to compete with these 'holes', the size of the hole need to be defined (how big before thinking this is the end)
@@ -256,16 +290,20 @@ sub generator {
     state $base = $self->name;
     state $alephx = $self->store->alephx;
 
-    my $doc_num = sprintf("%-9.9d",$count++);
-    my $find_doc = $alephx->find_doc(base => $base,doc_num => $doc_num,user_name => "");
+    my $doc;
+    do {
+        my $doc_num = sprintf("%-9.9d",$count++);
+        my $find_doc = $alephx->find_doc(base => $base,doc_num => $doc_num,user_name => "");
 
-    return unless $find_doc->is_success;
+        return unless $find_doc->is_success;
 
-    return {
-      record => $find_doc->record->metadata->data->{record},
-      _id => $doc_num
-    };
-    
+        $doc = {
+            record => $find_doc->record->metadata->data->{record},
+            _id => $doc_num
+        };
+    } while (check_deleted($doc) == 1);
+
+    return $doc;
   };
 }
 
