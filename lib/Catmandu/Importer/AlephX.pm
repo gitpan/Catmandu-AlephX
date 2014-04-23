@@ -12,6 +12,7 @@ our $VERSION = '0.02';
 has url     => (is => 'ro', required => 1);
 has base    => (is => 'ro', required => 1);
 has query   => (is => 'ro' );
+has skip_deleted => (is => 'ro', default => sub { 0 });
 has include_items => (is => 'ro',required => 0,lazy => 1,default => sub { 1; });
 has limit => (
   is => 'ro',
@@ -31,6 +32,15 @@ sub _fetch_items {
   
   return [] unless $item_data->is_success;
   return $item_data->items;
+}
+
+sub check_deleted {
+    my $r = $_[0];
+    return 1 unless defined $r;
+    for (@{$r->{record}}) {
+        return 1 if ($_->[0] eq 'DEL');
+    }
+    return 0;
 }
 
 sub generator {
@@ -96,24 +106,30 @@ sub generator {
 
       state $count = 1;
       state $alephx = $self->alephx;
+   
+      my $doc;
+
+      do { 
+        my $doc_num = sprintf("%-9.9d",$count++);     
+        my $find_doc = $alephx->find_doc(base => $self->base,doc_num => $doc_num);
+      
+        return unless $find_doc->is_success;
+
+        my $items = [];
+      
+        if($self->include_items){
+            $items = $self->_fetch_items($doc_num);
+        }
+
+        $doc = {
+            record => $find_doc->record->metadata->data->{record},
+            items => $items,
+            #do NOT use $record->metadata->data->{_id}, for that uses the field '001' that can be empty
+            _id => $doc_num
+        };
+      } while ($self->skip_deleted && check_deleted($doc) == 1);
     
-      my $doc_num = sprintf("%-9.9d",$count++);     
-      my $find_doc = $alephx->find_doc(base => $self->base,doc_num => $doc_num);
-      
-      return unless $find_doc->is_success;
-
-      my $items = [];
-      if($self->include_items){
-        $items = $self->_fetch_items($doc_num);
-      }
-
-      return {
-        record => $find_doc->record->metadata->data->{record},
-        items => $items,
-        #do NOT use $record->metadata->data->{_id}, for that uses the field '001' that can be empty
-        _id => $doc_num
-      };
-      
+      return $doc;
     };
   }
 }

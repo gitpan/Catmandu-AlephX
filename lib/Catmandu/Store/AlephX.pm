@@ -26,6 +26,7 @@ with 'Catmandu::Store';
 has url => (is => 'ro', required => 1);
 has username => ( is => 'ro' );
 has password => ( is => 'ro' );
+has skip_deleted => ( is => 'ro' , default => sub { 0 } );
 
 has alephx => (
   is       => 'ro',
@@ -112,7 +113,7 @@ sub get {
 
   my $doc = $find_doc->record->metadata->data;
 
-  return undef if check_deleted($doc);
+  return undef if $self->store->skip_deleted && check_deleted($doc);
 
   return $doc;
 }
@@ -301,7 +302,7 @@ sub generator {
             record => $find_doc->record->metadata->data->{record},
             _id => $doc_num
         };
-    } while (check_deleted($doc) == 1);
+    } while ($self->store->skip_deleted && check_deleted($doc) == 1);
 
     return $doc;
   };
