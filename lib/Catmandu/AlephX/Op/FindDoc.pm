@@ -1,6 +1,7 @@
 package Catmandu::AlephX::Op::FindDoc;
 use Catmandu::Sane;
 use Moo;
+use Catmandu::AlephX;
 use Catmandu::AlephX::Metadata::MARC::Aleph;
 use Catmandu::AlephX::Record;
 
@@ -15,6 +16,8 @@ sub op { 'find-doc' }
 sub parse {
   my($class,$str_ref,$args) = @_;
   my $doc_num = $args->{doc_num} || $args->{doc_number};
+
+  $doc_num = Catmandu::AlephX->format_doc_num($doc_num);
 
   my $xpath = xpath($str_ref);
   my $op = op();

@@ -4,7 +4,7 @@ use Carp qw(confess);
 use Moo;
 use Catmandu::Util qw(:check :is);
 
-our $VERSION = "1.064";
+our $VERSION = "1.065";
 
 has url => (
   is => 'ro',
@@ -643,6 +643,11 @@ sub user_auth {
 =cut
 sub update_doc {
   my($self,%args)=@_;
+
+  my $doc_num = $args{doc_num} || $args{doc_number};
+  delete $args{$_} for qw(doc_number doc_num);
+  $args{doc_num} = $self->format_doc_num($doc_num);
+
   require Catmandu::AlephX::Op::UpdateDoc;
   $args{op} = Catmandu::AlephX::Op::UpdateDoc->op();
 
@@ -722,6 +727,14 @@ sub update_item {
   $args{op} = Catmandu::AlephX::Op::UpdateItem->op();
   my $res = $self->ua->request(\%args,"POST");
   Catmandu::AlephX::Op::UpdateItem->parse($res->content_ref(),\%args);
+}
+
+sub format_doc_num {
+  my($class,$doc_num)=@_;
+  $doc_num = sprintf("%-9.9d",int($doc_num));
+
+  #alephx only reads first
+  substr($doc_num,0,9);
 }
 
 =head1 AUTHOR

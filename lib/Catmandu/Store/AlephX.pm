@@ -54,6 +54,7 @@ sub _build_alephx {
 package Catmandu::Store::AlephX::Bag;
 use Catmandu::Sane;
 use Moo;
+use Catmandu::AlephX;
 use Catmandu::Util qw(:check :is);
 use Catmandu::Hits;
 use Clone qw(clone);
@@ -69,7 +70,7 @@ before add => sub {
   if(is_string($_[1]->{_id})){
     $_[1]->{_id} =~ /^\d{9}$/o or confess("invalid _id ".$_[1]->{_id});   
   }else{
-    $_[1]->{_id} = sprintf("%-9.9d",0);
+    $_[1]->{_id} = Catmandu::AlephX->format_doc_num(0);
   }
 };
 
@@ -201,7 +202,7 @@ sub add {
       if($update_doc->errors()->[-1] =~ /Doc number given does not exist/i){
 
         #'If you want to insert a new document, then the doc_number you supply should be all zeroes'
-        my $new_doc_num = sprintf("%-9.9d",0);
+        my $new_doc_num = Catmandu::AlephX->format_doc_num(0);
 
         #last error should be 'Document: 000050105 was updated successfully.'
         $update_doc = $alephx->update_doc(
@@ -256,6 +257,8 @@ record is deleted.
 =cut
 sub delete {
   my($self,$id)= @_;
+
+  $id = Catmandu::AlephX->format_doc_num($id);
   
   my $xml_full_req = <<EOF;
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -293,7 +296,7 @@ sub generator {
 
     my $doc;
     do {
-        my $doc_num = sprintf("%-9.9d",$count++);
+        my $doc_num = Catmandu::AlephX->format_doc_num($count++);
         my $find_doc = $alephx->find_doc(base => $base,doc_num => $doc_num,user_name => "");
 
         return unless $find_doc->is_success;
@@ -335,9 +338,9 @@ sub search {
         my $no_records = int($find->no_records);
         my $no_entries = int($find->no_entries);
     
-        my $s = sprintf("%-9.9d",$start + 1);
+        my $s = Catmandu::AlephX->format_doc_num($start + 1);
         my $l = $start + $limit;
-        my $e = sprintf("%-9.9d",($l > $no_entries ? $no_entries : $l));
+        my $e = Catmandu::AlephX->format_doc_num($l > $no_entries ? $no_entries : $l);
         my $set_entry = "$s-$e";
 
         my $present = $alephx->present(set_number => $find->set_number,set_entry => $set_entry,format => 'marc',user_name => "");

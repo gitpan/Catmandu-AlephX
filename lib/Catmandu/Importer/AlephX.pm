@@ -71,9 +71,9 @@ sub generator {
 
         my $set_entry;
         {
-          my $start = sprintf("%-9.9d",$offset);
+          my $start = Catmandu::AlephX->format_doc_num($offset);
           my $l = $offset + $limit - 1;
-          my $end = sprintf("%-9.9d",($l > $no_entries ? $no_entries : $l));
+          my $end = Catmandu::AlephX->format_doc_num($l > $no_entries ? $no_entries : $l);
           $set_entry = "$start-$end";        
         }
         
@@ -110,7 +110,7 @@ sub generator {
       my $doc;
 
       do { 
-        my $doc_num = sprintf("%-9.9d",$count++);     
+        my $doc_num = Catmandu::AlephX->format_doc_num($count++);
         my $find_doc = $alephx->find_doc(base => $self->base,doc_num => $doc_num);
       
         return unless $find_doc->is_success;
